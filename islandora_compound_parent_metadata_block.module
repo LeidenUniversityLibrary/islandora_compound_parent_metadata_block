@@ -1,0 +1,186 @@
+<?php
+
+/**
+ * @file
+ * Functions for the Islandora Compound Parent Metadata Block module.
+ *
+ * Based on the islandora_blocks module by echidnacorp and the
+ * islandora_compound_parent_metadata module by mjordan.
+ * (this module might be merged with the islandora_blocks module in the future)
+ */
+
+/**
+ * Implements hook_block_info().
+ */
+function islandora_compound_parent_metadata_block_block_info() {
+
+  $blocks['compound_parent_metadata'] = array(
+    'info' => t('Compound Parent Metadata'),
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function islandora_compound_parent_metadata_block_block_view($delta = '') {
+  // If there is no object there are no blocks.
+  $object = menu_get_object('islandora_object', 2);
+  if (!$object) {
+    return FALSE;
+  }
+
+  // We should be on the "view" callback.
+  $menu_item = menu_get_item();
+  if ($menu_item['path'] != 'islandora/object/%/view' && $menu_item['path'] != 'islandora/object/%') {
+    return FALSE;
+  }
+
+  $block = array();
+  switch ($delta) {
+    case 'compound_parent_metadata':
+      $parent_info = islandora_compound_object_retrieve_compound_info($object);
+      if (!isset($parent_info['parent_pid'])) {
+        return FALSE;
+      }
+      $parent_object = islandora_object_load($parent_info['parent_pid']);
+      if (!$parent_object) {
+        return FALSE;
+      }
+      $form = drupal_get_form('islandora_compound_parent_metadata_form', $parent_object);
+
+      $block['subject'] = t('Parent Metadata');
+      $block['content'] = drupal_render($form);
+      break;
+
+  }
+
+  return $block;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function islandora_compound_parent_metadata_block_block_configure($delta = '') {
+  $form = array();
+
+  switch ($delta) {
+    case 'compound_parent_metadata':
+      // Allow the block administrator to choose which metadata sets are
+      // displayed in the metadata block.
+      $form['islandora_compound_parent_metadata_sets_display'] = array(
+        '#type' => 'select',
+        '#title' => t('Parent metadata set to display'),
+        '#description' => t('Choose which parent metadata to display.'),
+        '#options' => _islandora_compound_parent_metadata_block_available_metadata_sets(),
+        '#default_value' => variable_get('islandora_compound_parent_metadata_sets_display', array('dc_metadata' => 'dc_metadata')),
+      );
+      break;
+  }
+
+  return $form;
+}
+
+/**
+ * Implements hook_block_save().
+ */
+function islandora_compound_parent_metadata_block_block_save($delta = '', $edit = array()) {
+  switch ($delta) {
+    case 'compound_parent_metadata':
+      // Allow the block administrator to choose which metadata sets are
+      // displayed in the metadata block.
+      variable_set('islandora_compound_parent_metadata_sets_display', $edit['islandora_compound_parent_metadata_sets_display']);
+      break;
+  }
+}
+
+/**
+ * Form callback: Form constructor for a display of metadata.
+ *
+ * @param array $form
+ *   The form object.
+ * @param array &$form_state
+ *   The form state object. Must contain the Fedora object that we want to
+ *   display the metadata form as the first item in the array at
+ *   $form_state['build_info']['args'].
+ *
+ * @return array
+ *   A form array for metadata.
+ *
+ * @ingroup forms
+ */
+function islandora_compound_parent_metadata_form($form, &$form_state) {
+  $md_set_to_display = variable_get('islandora_compound_parent_metadata_sets_display', array('dc_metadata' => 'dc_metadata'));
+
+  // The Fedora object should be the first build argument.
+  $object = reset($form_state['build_info']['args']);
+
+  // If we have determined that the dependencies to display Solr metadata are
+  // available, and the block administrator wants to display Solr metadata in
+  // this block, display the container.
+  if ($md_set_to_display === 'solr_metadata') {
+    // Find the fields we should query and display.
+    module_load_include('inc', 'islandora_solr_metadata', 'includes/db');
+    $associations = islandora_solr_metadata_get_associations_by_cmodels($object->models);
+
+    // Render the object's Solr metadata.
+    $form['solr_metadata'] = array(
+      '#type' => 'container',
+      'metadata' => array(
+        '#theme' => 'islandora_solr_metadata_display',
+        '#islandora_object' => $object,
+        '#print' => TRUE,
+        '#associations' => $associations,
+      ),
+    );
+  }
+
+  // If we have determined that the dependencies to display DC metadata are
+  // available, and the block administrator wants to display DC metadata in this
+  // block, display the container.
+  if ($md_set_to_display === 'dc_metadata') {
+    // Render the object's DC metadata.
+    $form['dc_metadata'] = array(
+      '#type' => 'container',
+      'metadata' => array(
+        '#theme' => 'islandora_dublin_core_display',
+        '#islandora_object' => $object,
+        '#print' => TRUE,
+      ),
+    );
+  }
+
+  return $form;
+}
+
+/* Helper functions. */
+
+/**
+ * Return a list of available metadata sets.
+ *
+ * @return array
+ *   An associative array of zero or more metadata sets:
+ *   - solr_metadata: Indexed (Solr) Metadata
+ *   - dc_metadata: Basic (Dublin Core) Metadata
+ */
+function _islandora_compound_parent_metadata_block_available_metadata_sets() {
+  // Cache metadata sets per request.
+  $available_metadata_sets = &drupal_static(__FUNCTION__);
+  if (!isset($available_metadata_sets)) {
+    $available_metadata_sets = array();
+
+    // If the Islandora Solr Metadata module is installed, we can display
+    // Indexed Solr metadata.
+    if (module_exists('islandora_solr_metadata')) {
+      $available_metadata_sets['solr_metadata'] = t('Indexed (Solr) Metadata');
+    }
+
+    // If the Islandora module is available, we can display DC metadata.
+    if (module_exists('islandora')) {
+      $available_metadata_sets['dc_metadata'] = t('Basic (Dublin Core) Metadata');
+    }
+  }
+
+  return $available_metadata_sets;
+}
