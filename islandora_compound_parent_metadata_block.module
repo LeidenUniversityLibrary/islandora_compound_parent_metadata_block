@@ -16,6 +16,7 @@ function islandora_compound_parent_metadata_block_block_info() {
 
   $blocks['compound_parent_metadata'] = array(
     'info' => t('Compound Parent Metadata'),
+    'cache' => DRUPAL_CACHE_PER_PAGE,
   );
 
   return $blocks;
@@ -74,7 +75,7 @@ function islandora_compound_parent_metadata_block_block_configure($delta = '') {
         '#title' => t('Parent metadata set to display'),
         '#description' => t('Choose which parent metadata to display.'),
         '#options' => _islandora_compound_parent_metadata_block_available_metadata_sets(),
-        '#default_value' => variable_get('islandora_compound_parent_metadata_sets_display', array('dc_metadata' => 'dc_metadata')),
+        '#default_value' => variable_get('islandora_compound_parent_metadata_sets_display', 'dc_metadata'),
       );
       break;
   }
@@ -111,7 +112,7 @@ function islandora_compound_parent_metadata_block_block_save($delta = '', $edit 
  * @ingroup forms
  */
 function islandora_compound_parent_metadata_form($form, &$form_state) {
-  $md_set_to_display = variable_get('islandora_compound_parent_metadata_sets_display', array('dc_metadata' => 'dc_metadata'));
+  $md_set_to_display = variable_get('islandora_compound_parent_metadata_sets_display', 'dc_metadata');
 
   // The Fedora object should be the first build argument.
   $object = reset($form_state['build_info']['args']);
