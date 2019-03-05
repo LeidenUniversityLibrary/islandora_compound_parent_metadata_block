@@ -42,13 +42,28 @@ function islandora_compound_parent_metadata_block_block_view($delta = '') {
   switch ($delta) {
     case 'compound_parent_metadata':
       $parent_info = islandora_compound_object_retrieve_compound_info($object);
+      $return_parent = "";
       if (!isset($parent_info['parent_pid'])) {
+        $return_parent = "false";
+      }
+      if ($parent_info) {
+        $parent_object = islandora_object_load($parent_info['parent_pid']);
+      }
+      if (!isset($parent_object)) {
+        $return_parent = "false";
+      }
+
+// Probem: it's returning FALSE before we can run this. Maybe change to a variable, then at end if variable = wahtever, return false
+
+      if ($object->models[0] == 'islandora:compoundCModel') {
+        $parent_object = $object;
+        $return_parent = "true";
+      }
+
+      if ($return_parent == "false") {
         return FALSE;
       }
-      $parent_object = islandora_object_load($parent_info['parent_pid']);
-      if (!$parent_object) {
-        return FALSE;
-      }
+
       $form = drupal_get_form('islandora_compound_parent_metadata_form', $parent_object);
 
       $block['subject'] = t('Parent Metadata');
