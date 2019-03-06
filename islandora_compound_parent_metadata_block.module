@@ -42,21 +42,24 @@ function islandora_compound_parent_metadata_block_block_view($delta = '') {
   switch ($delta) {
     case 'compound_parent_metadata':
       $parent_info = islandora_compound_object_retrieve_compound_info($object);
-      if (!isset($parent_info['parent_pid'])) {
-        return FALSE;
+      $parent_object = FALSE;
+      if (isset($parent_info['parent_pid'])) {
+        $parent_object = islandora_object_load($parent_info['parent_pid']);
       }
-      $parent_object = islandora_object_load($parent_info['parent_pid']);
+      // If object has no compound parent, see if it's a Compound Object itself.
+      elseif (in_array('islandora:compoundCModel', $object->models)) {
+        $parent_object = $object;
+      }                
       if (!$parent_object) {
         return FALSE;
       }
+
       $form = drupal_get_form('islandora_compound_parent_metadata_form', $parent_object);
 
       $block['subject'] = t('Parent Metadata');
       $block['content'] = drupal_render($form);
       break;
-
   }
-
   return $block;
 }
 
